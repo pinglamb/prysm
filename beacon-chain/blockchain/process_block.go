@@ -3,6 +3,9 @@ package blockchain
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/prysmaticlabs/prysm/beacon-chain/db/filters"
 
 	"github.com/pkg/errors"
 	ethpb "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
@@ -84,14 +87,82 @@ func (s *Service) onBlock(ctx context.Context, signed *ethpb.SignedBeaconBlock, 
 		return err
 	}
 
-	postState, err := state.ExecuteStateTransition(ctx, preState, signed)
+	sigSet, postState, err := state.ExecuteStateTransitionNoVerifyAnySig(ctx, preState, signed)
 	if err != nil {
 		return errors.Wrap(err, "could not execute state transition")
 	}
-
+	verified, err := sigSet.Verify()
+	if err != nil {
+		return err
+	}
+	if !verified {
+		return helpers.ErrSigFailedToVerify
+	}
+	blks, rts, err := s.beaconDB.Blocks(ctx, filters.NewFilter().SetStartSlot(b.Slot-250).SetEndSlot(b.Slot-200))
+	if err != nil {
+		return err
+	}
+	wantedBlk := blks[0]
+	wantedRt := rts[0]
+	for i, bloc := range blks {
+		if s.beaconDB.HasStateSummary(ctx, rts[i]) {
+			wantedBlk = bloc
+			wantedRt = rts[i]
+			break
+		}
+	}
+	currEpoch := helpers.SlotToEpoch(wantedBlk.Block.Slot)
+	fStart, err := helpers.StartSlot(currEpoch - 4)
+	if err != nil {
+		return err
+	}
+	jStart, err := helpers.StartSlot(currEpoch - 2)
+	if err != nil {
+		return err
+	}
+	rf, err := s.ancestorByForkChoiceStore(context.Background(), wantedRt, fStart)
+	if err != nil {
+		return err
+	}
+	rj, err := s.ancestorByForkChoiceStore(context.Background(), wantedRt, jStart)
+	if err != nil {
+		return err
+	}
+	ctx = context.Background()
+	_, err = s.stateGen.StateByRoot(ctx, bytesutil.ToBytes32(rf))
+	if err != nil {
+		return err
+	}
+	_, err = s.stateGen.StateByRoot(ctx, bytesutil.ToBytes32(rj))
+	if err != nil {
+		return err
+	}
+	err = postState.SetCurrentJustifiedCheckpoint(&ethpb.Checkpoint{
+		Epoch: currEpoch - 2,
+		Root:  rj,
+	})
+	if err != nil {
+		return err
+	}
+	err = postState.SetFinalizedCheckpoint(&ethpb.Checkpoint{
+		Epoch: currEpoch - 4,
+		Root:  rf,
+	})
+	if err != nil {
+		return err
+	}
+	curr := time.Now()
+	timePointer := time.Now()
+	log.Errorf("starting now %d", curr.Unix())
+	defer func() {
+		log.Errorf("clean-up took %d", time.Since(curr).Milliseconds())
+	}()
 	if err := s.savePostStateInfo(ctx, blockRoot, signed, postState, false /* reg sync */); err != nil {
 		return err
 	}
+	diff := time.Since(timePointer)
+	timePointer = time.Now()
+	log.Errorf("1st %d", diff.Milliseconds())
 
 	// Update justified check point.
 	if postState.CurrentJustifiedCheckpoint().Epoch > s.justifiedCheckpt.Epoch {
@@ -99,44 +170,60 @@ func (s *Service) onBlock(ctx context.Context, signed *ethpb.SignedBeaconBlock, 
 			return err
 		}
 	}
+	diff = time.Since(timePointer)
+	timePointer = time.Now()
+	log.Errorf("2nd %d", diff.Milliseconds())
 
 	// Update finalized check point.
-	if postState.FinalizedCheckpointEpoch() > s.finalizedCheckpt.Epoch {
-		if err := s.beaconDB.SaveBlocks(ctx, s.getInitSyncBlocks()); err != nil {
-			return err
-		}
-		s.clearInitSyncBlocks()
+	if err := s.beaconDB.SaveBlocks(ctx, s.getInitSyncBlocks()); err != nil {
+		return err
+	}
+	s.clearInitSyncBlocks()
+	diff = time.Since(timePointer)
+	timePointer = time.Now()
+	log.Errorf("3rd %d", diff.Milliseconds())
 
-		if err := s.updateFinalized(ctx, postState.FinalizedCheckpoint()); err != nil {
-			return err
-		}
+	if err := s.updateFinalized(ctx, postState.FinalizedCheckpoint()); err != nil {
+		return err
+	}
+	diff = time.Since(timePointer)
+	timePointer = time.Now()
+	log.Errorf("4th %d", diff.Milliseconds())
 
-		fRoot := bytesutil.ToBytes32(postState.FinalizedCheckpoint().Root)
-		if err := s.forkChoiceStore.Prune(ctx, fRoot); err != nil {
-			return errors.Wrap(err, "could not prune proto array fork choice nodes")
-		}
+	fRoot := bytesutil.ToBytes32(postState.FinalizedCheckpoint().Root)
+	if err := s.forkChoiceStore.Prune(ctx, fRoot); err != nil {
+		return errors.Wrap(err, "could not prune proto array fork choice nodes")
+	}
+	diff = time.Since(timePointer)
+	timePointer = time.Now()
+	log.Errorf("5th %d", diff.Milliseconds())
 
-		if err := s.finalizedImpliesNewJustified(ctx, postState); err != nil {
-			return errors.Wrap(err, "could not save new justified")
-		}
+	if err := s.finalizedImpliesNewJustified(ctx, postState); err != nil {
+		return errors.Wrap(err, "could not save new justified")
+	}
+	diff = time.Since(timePointer)
+	timePointer = time.Now()
+	log.Errorf("6th %d", diff.Milliseconds())
 
-		// Update deposit cache.
-		finalizedState, err := s.stateGen.StateByRoot(ctx, fRoot)
-		if err != nil {
-			return errors.Wrap(err, "could not fetch finalized state")
-		}
-		// We update the cache up to the last deposit index in the finalized block's state.
-		// We can be confident that these deposits will be included in some block
-		// because the Eth1 follow distance makes such long-range reorgs extremely unlikely.
-		eth1DepositIndex := int64(finalizedState.Eth1Data().DepositCount - 1)
-		s.depositCache.InsertFinalizedDeposits(ctx, eth1DepositIndex)
-		if featureconfig.Get().EnablePruningDepositProofs {
-			// Deposit proofs are only used during state transition and can be safely removed to save space.
-			if err = s.depositCache.PruneProofs(ctx, eth1DepositIndex); err != nil {
-				return errors.Wrap(err, "could not prune deposit proofs")
-			}
+	// Update deposit cache.
+	finalizedState, err := s.stateGen.StateByRoot(ctx, fRoot)
+	if err != nil {
+		return errors.Wrap(err, "could not fetch finalized state")
+	}
+	// We update the cache up to the last deposit index in the finalized block's state.
+	// We can be confident that these deposits will be included in some block
+	// because the Eth1 follow distance makes such long-range reorgs extremely unlikely.
+	eth1DepositIndex := int64(finalizedState.Eth1Data().DepositCount - 1)
+	s.depositCache.InsertFinalizedDeposits(ctx, eth1DepositIndex)
+	if featureconfig.Get().EnablePruningDepositProofs {
+		// Deposit proofs are only used during state transition and can be safely removed to save space.
+		if err = s.depositCache.PruneProofs(ctx, eth1DepositIndex); err != nil {
+			return errors.Wrap(err, "could not prune deposit proofs")
 		}
 	}
+	diff = time.Since(timePointer)
+	timePointer = time.Now()
+	log.Errorf("7th %d", diff.Milliseconds())
 
 	defer reportAttestationInclusion(b)
 

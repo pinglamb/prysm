@@ -352,6 +352,11 @@ func (ms *ChainService) HasInitSyncBlock(_ [32]byte) bool {
 	return false
 }
 
+// GetInitSyncBlock mocks the same method in the chain service.
+func (ms *ChainService) GetInitSyncBlock(_ [32]byte) *ethpb.SignedBeaconBlock {
+	return &ethpb.SignedBeaconBlock{}
+}
+
 // HeadGenesisValidatorRoot mocks HeadGenesisValidatorRoot method in chain service.
 func (ms *ChainService) HeadGenesisValidatorRoot() [32]byte {
 	return [32]byte{}
