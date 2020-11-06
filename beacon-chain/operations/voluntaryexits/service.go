@@ -65,12 +65,12 @@ func (p *Pool) InsertVoluntaryExit(ctx context.Context, state *beaconstate.Beaco
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	// Has this validator index been included recently?
+	// has this validator index been included recently?
 	if p.included[exit.Exit.ValidatorIndex] {
 		return
 	}
 
-	// Has the validator been exited already?
+	// has the validator been exited already?
 	if v, err := state.ValidatorAtIndexReadOnly(exit.Exit.ValidatorIndex); err != nil || v.ExitEpoch() != params.BeaconConfig().FarFutureEpoch {
 		return
 	}

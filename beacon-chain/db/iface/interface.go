@@ -27,19 +27,17 @@ type ReadOnlyDatabase interface {
 	FinalizedChildBlock(ctx context.Context, blockRoot [32]byte) (*eth.SignedBeaconBlock, error)
 	HighestSlotBlocksBelow(ctx context.Context, slot uint64) ([]*eth.SignedBeaconBlock, error)
 	// State related methods.
-	State(ctx context.Context, blockRoot [32]byte) (*state.BeaconState, error)
 	GenesisState(ctx context.Context) (*state.BeaconState, error)
-	HasState(ctx context.Context, blockRoot [32]byte) (bool, error)
-	StateSummary(ctx context.Context, blockRoot [32]byte) (*ethereum_beacon_p2p_v1.StateSummary, error)
-	HasStateSummary(ctx context.Context, blockRoot [32]byte) bool
-	HighestSlotStatesBelow(ctx context.Context, slot uint64) ([]*state.BeaconState, error)
 	StateByRoot(ctx context.Context, blockRoot [32]byte) (*state.BeaconState, error)
 	StateByRootInitialSync(ctx context.Context, blockRoot [32]byte) (*state.BeaconState, error)
 	StateBySlot(ctx context.Context, slot uint64) (*state.BeaconState, error)
+	HasState(ctx context.Context, blockRoot [32]byte) (bool, error)
 	HasStateInCache(ctx context.Context, blockRoot [32]byte) (bool, error)
+	StateSummary(ctx context.Context, blockRoot [32]byte) (*ethereum_beacon_p2p_v1.StateSummary, error)
+	HasStateSummary(ctx context.Context, blockRoot [32]byte) bool
+	HighestSlotStatesBelow(ctx context.Context, slot uint64) ([]*state.BeaconState, error)
 	Resume(ctx context.Context) (*state.BeaconState, error)
 	SaveFinalizedState(fSlot uint64, fRoot [32]byte, fState *state.BeaconState)
-	StateSummaryExists(ctx context.Context, blockRoot [32]byte) bool
 	// Slashing operations.
 	ProposerSlashing(ctx context.Context, slashingRoot [32]byte) (*eth.ProposerSlashing, error)
 	AttesterSlashing(ctx context.Context, slashingRoot [32]byte) (*eth.AttesterSlashing, error)
@@ -79,7 +77,6 @@ type NoHeadAccessDatabase interface {
 	EnableSaveHotStateToDB(_ context.Context)
 	DisableSaveHotStateToDB(ctx context.Context) error
 	ForceCheckpoint(ctx context.Context, root []byte) error
-	SaveStateByRoot(ctx context.Context, blockRoot [32]byte, state *state.BeaconState) error
 	MigrateToCold(ctx context.Context, fRoot [32]byte) error
 	// Slashing operations.
 	SaveProposerSlashing(ctx context.Context, slashing *eth.ProposerSlashing) error

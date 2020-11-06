@@ -19,16 +19,16 @@ func NewStateSummaryCache() *StateSummaryCache {
 	}
 }
 
-// Put saves a state summary to the initial sync state summaries cache.
-func (s *StateSummaryCache) Put(r [32]byte, b *pb.StateSummary) {
+// put saves a state summary to the initial sync state summaries cache.
+func (s *StateSummaryCache) put(r [32]byte, b *pb.StateSummary) {
 	s.initSyncStateSummariesLock.Lock()
 	defer s.initSyncStateSummariesLock.Unlock()
 	s.initSyncStateSummaries[r] = b
 }
 
-// Has checks if a state summary exists in the initial sync state summaries cache using the root
+// has checks if a state summary exists in the initial sync state summaries cache using the root
 // of the block.
-func (s *StateSummaryCache) Has(r [32]byte) bool {
+func (s *StateSummaryCache) has(r [32]byte) bool {
 	s.initSyncStateSummariesLock.RLock()
 	defer s.initSyncStateSummariesLock.RUnlock()
 	_, ok := s.initSyncStateSummaries[r]
@@ -37,16 +37,16 @@ func (s *StateSummaryCache) Has(r [32]byte) bool {
 
 // Get retrieves a state summary from the initial sync state summaries cache using the root of
 // the block.
-func (s *StateSummaryCache) Get(r [32]byte) *pb.StateSummary {
+func (s *StateSummaryCache) get(r [32]byte) *pb.StateSummary {
 	s.initSyncStateSummariesLock.RLock()
 	defer s.initSyncStateSummariesLock.RUnlock()
 	b := s.initSyncStateSummaries[r]
 	return b
 }
 
-// GetAll retrieves all the beacon state summaries from the initial sync state summaries cache, the returned
+// getAll retrieves all the beacon state summaries from the initial sync state summaries cache, the returned
 // state summaries are unordered.
-func (s *StateSummaryCache) GetAll() []*pb.StateSummary {
+func (s *StateSummaryCache) getAll() []*pb.StateSummary {
 	s.initSyncStateSummariesLock.RLock()
 	defer s.initSyncStateSummariesLock.RUnlock()
 
@@ -57,8 +57,8 @@ func (s *StateSummaryCache) GetAll() []*pb.StateSummary {
 	return summaries
 }
 
-// Clear clears out the initial sync state summaries cache.
-func (s *StateSummaryCache) Clear() {
+// clear clears out the initial sync state summaries cache.
+func (s *StateSummaryCache) clear() {
 	s.initSyncStateSummariesLock.Lock()
 	defer s.initSyncStateSummariesLock.Unlock()
 	s.initSyncStateSummaries = make(map[[32]byte]*pb.StateSummary)

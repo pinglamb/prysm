@@ -12,7 +12,6 @@ go_library(
         "common.go",
         "doc.go",
         "skip_slot_cache.go",
-        "state_summary.go",
         "subnet_ids.go",
         "proposer_indices_type.go",
     ] + select({

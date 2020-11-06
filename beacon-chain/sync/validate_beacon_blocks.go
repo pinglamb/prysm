@@ -125,8 +125,7 @@ func (s *Service) validateBeaconBlockPubSub(ctx context.Context, pid peer.ID, ms
 	}
 
 	hasStateSummaryDB := s.db.HasStateSummary(ctx, bytesutil.ToBytes32(blk.Block.ParentRoot))
-	hasStateSummaryCache := s.stateSummaryCache.Has(bytesutil.ToBytes32(blk.Block.ParentRoot))
-	if !hasStateSummaryDB && !hasStateSummaryCache {
+	if !hasStateSummaryDB {
 		log.WithError(err).WithField("blockSlot", blk.Block.Slot).Warn("No access to parent state")
 		return pubsub.ValidationIgnore
 	}

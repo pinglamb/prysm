@@ -60,8 +60,8 @@ func (s *Service) processPendingAtts(ctx context.Context) error {
 		s.pendingAttsLock.RLock()
 		attestations := s.blkRootToPendingAtts[bRoot]
 		s.pendingAttsLock.RUnlock()
-		// Has the pending attestation's missing block arrived and the node processed block yet?
-		hasStateSummary := s.db.HasStateSummary(ctx, bRoot) || s.stateSummaryCache.Has(bRoot)
+		// has the pending attestation's missing block arrived and the node processed block yet?
+		hasStateSummary := s.db.HasStateSummary(ctx, bRoot)
 		hasState, err := s.db.HasState(ctx, bRoot)
 		if err != nil {
 			return err

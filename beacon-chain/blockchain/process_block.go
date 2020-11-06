@@ -278,14 +278,14 @@ func (s *Service) onBlockBatch(ctx context.Context, blks []*ethpb.SignedBeaconBl
 		return nil, nil, errors.New("batch block signature verification failed")
 	}
 	for r, st := range boundaries {
-		if err := s.beaconDB.SaveStateByRoot(ctx, r, st); err != nil {
+		if err := s.beaconDB.SaveState(ctx, st, r); err != nil {
 			return nil, nil, err
 		}
 	}
 	// Also saves the last post state which to be used as pre state for the next batch.
 	lastB := blks[len(blks)-1]
 	lastBR := blockRoots[len(blockRoots)-1]
-	if err := s.beaconDB.SaveStateByRoot(ctx, lastBR, preState); err != nil {
+	if err := s.beaconDB.SaveState(ctx, preState, lastBR); err != nil {
 		return nil, nil, err
 	}
 	if err := s.saveHeadNoDB(ctx, lastB, lastBR, preState); err != nil {
@@ -402,7 +402,7 @@ func (s *Service) savePostStateInfo(ctx context.Context, r [32]byte, b *ethpb.Si
 	} else if err := s.beaconDB.SaveBlock(ctx, b); err != nil {
 		return errors.Wrapf(err, "could not save block from slot %d", b.Block.Slot)
 	}
-	if err := s.beaconDB.SaveStateByRoot(ctx, r, state); err != nil {
+	if err := s.beaconDB.SaveState(ctx, state, r); err != nil {
 		return errors.Wrap(err, "could not save state")
 	}
 	if err := s.insertBlockAndAttestationsToForkChoiceStore(ctx, b.Block, r, state); err != nil {

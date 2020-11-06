@@ -116,9 +116,9 @@ func (s *Service) processAttestation(subscribedToStateEvents chan struct{}) {
 					continue
 				}
 
-				hasState := s.beaconDB.StateSummaryExists(ctx, bytesutil.ToBytes32(a.Data.BeaconBlockRoot))
+				hasStateSummary := s.beaconDB.HasStateSummary(ctx, bytesutil.ToBytes32(a.Data.BeaconBlockRoot))
 				hasBlock := s.hasBlock(ctx, bytesutil.ToBytes32(a.Data.BeaconBlockRoot))
-				if !(hasState && hasBlock) {
+				if !(hasStateSummary && hasBlock) {
 					continue
 				}
 

@@ -115,10 +115,10 @@ func (s *Store) MigrateToCold(ctx context.Context, fRoot [32]byte) error {
 	}
 
 	// Migrate all state summary objects from state summary cache to DB.
-	if err := s.SaveStateSummaries(ctx, s.stateSummaryCache.GetAll()); err != nil {
+	if err := s.SaveStateSummaries(ctx, s.stateSummaryCache.getAll()); err != nil {
 		return err
 	}
-	s.stateSummaryCache.Clear()
+	s.stateSummaryCache.clear()
 
 	// Update finalized info in memory.
 	fInfo, ok, err := s.epochBoundaryStateCache.getByRoot(fRoot)
