@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	ethpb "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
 	transition "github.com/prysmaticlabs/prysm/beacon-chain/core/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/db/filters"
@@ -13,9 +15,19 @@ import (
 	"go.opencensus.io/trace"
 )
 
+var (
+	replayBlockCount = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "replay_blocks_count",
+			Help:    "The number of blocks to replay to generate a state",
+			Buckets: []float64{64, 256, 1024, 2048, 4096},
+		},
+	)
+)
+
 // ReplayBlocks replays the input blocks on the input state until the target slot is reached.
 func (s *Store) ReplayBlocks(ctx context.Context, state *stateTrie.BeaconState, signed []*ethpb.SignedBeaconBlock, targetSlot uint64) (*stateTrie.BeaconState, error) {
-	ctx, span := trace.StartSpan(ctx, "stateGen.ReplayBlocks")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.ReplayBlocks")
 	defer span.End()
 
 	var err error
@@ -120,7 +132,7 @@ func executeStateTransitionStateGen(
 		return nil, ctx.Err()
 	}
 	if signed == nil || signed.Block == nil {
-		return nil, errUnknownBlock
+		return nil, errors.New("unknown block")
 	}
 
 	ctx, span := trace.StartSpan(ctx, "beacon-chain.ChainService.ExecuteStateTransitionStateGen")
@@ -152,7 +164,7 @@ func processSlotsStateGen(ctx context.Context, state *stateTrie.BeaconState, slo
 	ctx, span := trace.StartSpan(ctx, "beacon-chain.ChainService.ProcessSlotsStateGen")
 	defer span.End()
 	if state == nil {
-		return nil, errUnknownState
+		return nil, errors.New("unknown state")
 	}
 
 	if state.Slot() > slot {
@@ -188,7 +200,7 @@ func processSlotsStateGen(ctx context.Context, state *stateTrie.BeaconState, slo
 // it returns the block root and the slot of the block.
 // This is used by both hot and cold state management.
 func (s *Store) lastSavedBlock(ctx context.Context, slot uint64) ([32]byte, uint64, error) {
-	ctx, span := trace.StartSpan(ctx, "stateGen.lastSavedBlock")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.lastSavedBlock")
 	defer span.End()
 
 	// Handle the genesis case where the input slot is 0.
@@ -224,7 +236,7 @@ func (s *Store) lastSavedBlock(ctx context.Context, slot uint64) ([32]byte, uint
 // it returns the block root of the block which was used to produce the state.
 // This is used by both hot and cold state management.
 func (s *Store) lastSavedState(ctx context.Context, slot uint64) (*stateTrie.BeaconState, error) {
-	ctx, span := trace.StartSpan(ctx, "stateGen.lastSavedState")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.lastSavedState")
 	defer span.End()
 
 	// Handle the genesis case where the input slot is 0.
@@ -242,7 +254,7 @@ func (s *Store) lastSavedState(ctx context.Context, slot uint64) (*stateTrie.Bea
 		return nil, fmt.Errorf("highest saved state does not equal to 1, it equals to %d", len(lastSaved))
 	}
 	if lastSaved[0] == nil {
-		return nil, errUnknownState
+		return nil, errors.New("unknown state")
 	}
 
 	return lastSaved[0], nil

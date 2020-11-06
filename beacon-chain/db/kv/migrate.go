@@ -3,6 +3,7 @@ package kv
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	stateTrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
@@ -15,7 +16,7 @@ import (
 // It moves the recent finalized states from the hot section to the cold section and
 // only preserve the ones that's on archived point.
 func (s *Store) MigrateToCold(ctx context.Context, fRoot [32]byte) error {
-	ctx, span := trace.StartSpan(ctx, "stateGen.MigrateToCold")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.MigrateToCold")
 	defer span.End()
 
 	s.finalizedInfo.lock.RLock()
@@ -62,7 +63,7 @@ func (s *Store) MigrateToCold(ctx context.Context, fRoot [32]byte) error {
 				// Given the block has been finalized, the db should not have more than one block in a given slot.
 				// We should error out when this happens.
 				if len(blks) != 1 {
-					return errUnknownBlock
+					return errors.New("unknown block")
 				}
 				missingRoot, err := blks[0].Block.HashTreeRoot()
 				if err != nil {
@@ -126,7 +127,9 @@ func (s *Store) MigrateToCold(ctx context.Context, fRoot [32]byte) error {
 		return err
 	}
 	if ok {
-		s.SaveFinalizedState(fSlot, fRoot, fInfo.state)
+		s.finalizedInfo.root = fRoot
+		s.finalizedInfo.state = fInfo.state.Copy()
+		s.finalizedInfo.slot = fSlot
 	}
 
 	return nil

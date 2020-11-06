@@ -3,7 +3,6 @@
 package kv
 
 import (
-	"context"
 	"os"
 	"path"
 	"sync"
@@ -15,10 +14,8 @@ import (
 	prombolt "github.com/prysmaticlabs/prombbolt"
 	"github.com/prysmaticlabs/prysm/beacon-chain/db/iface"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/shared/bytesutil"
 	"github.com/prysmaticlabs/prysm/shared/params"
 	bolt "go.etcd.io/bbolt"
-	"go.opencensus.io/trace"
 )
 
 var _ iface.Database = (*Store)(nil)
@@ -192,56 +189,4 @@ func createBuckets(tx *bolt.Tx, buckets ...[]byte) error {
 // createBoltCollector returns a prometheus collector specifically configured for boltdb.
 func createBoltCollector(db *bolt.DB) prometheus.Collector {
 	return prombolt.New("boltDB", db)
-}
-
-// Resume resumes a new state management object from previously saved finalized check point in DB.
-func (s *Store) Resume(ctx context.Context) (*state.BeaconState, error) {
-	ctx, span := trace.StartSpan(ctx, "stateGen.Resume")
-	defer span.End()
-
-	c, err := s.FinalizedCheckpoint(ctx)
-	if err != nil {
-		return nil, err
-	}
-	fRoot := bytesutil.ToBytes32(c.Root)
-	// Resume as genesis state if last finalized root is zero hashes.
-	if fRoot == params.BeaconConfig().ZeroHash {
-		return s.GenesisState(ctx)
-	}
-	fState, err := s.StateByRoot(ctx, fRoot)
-	if err != nil {
-		return nil, err
-	}
-	if fState == nil {
-		return nil, errors.New("finalized state not found in disk")
-	}
-
-	s.finalizedInfo = &finalizedInfo{slot: fState.Slot(), root: fRoot, state: fState.Copy()}
-
-	return fState, nil
-}
-
-// SaveFinalizedState saves the finalized slot, root and state into memory to be used by state gen service.
-// This used for migration at the correct start slot and used for hot state play back to ensure
-// lower bound to start is always at the last finalized state.
-func (s *Store) SaveFinalizedState(fSlot uint64, fRoot [32]byte, fState *state.BeaconState) {
-	s.finalizedInfo.lock.Lock()
-	defer s.finalizedInfo.lock.Unlock()
-	s.finalizedInfo.root = fRoot
-	s.finalizedInfo.state = fState.Copy()
-	s.finalizedInfo.slot = fSlot
-}
-
-// Returns true if input root equals to cached finalized root.
-func (s *Store) isFinalizedRoot(r [32]byte) bool {
-	s.finalizedInfo.lock.RLock()
-	defer s.finalizedInfo.lock.RUnlock()
-	return r == s.finalizedInfo.root
-}
-
-// Returns the cached and copied finalized state.
-func (s *Store) finalizedState() *state.BeaconState {
-	s.finalizedInfo.lock.RLock()
-	defer s.finalizedInfo.lock.RUnlock()
-	return s.finalizedInfo.state.Copy()
 }

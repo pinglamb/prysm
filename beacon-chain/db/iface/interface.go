@@ -36,8 +36,7 @@ type ReadOnlyDatabase interface {
 	StateSummary(ctx context.Context, blockRoot [32]byte) (*ethereum_beacon_p2p_v1.StateSummary, error)
 	HasStateSummary(ctx context.Context, blockRoot [32]byte) bool
 	HighestSlotStatesBelow(ctx context.Context, slot uint64) ([]*state.BeaconState, error)
-	Resume(ctx context.Context) (*state.BeaconState, error)
-	SaveFinalizedState(fSlot uint64, fRoot [32]byte, fState *state.BeaconState)
+
 	// Slashing operations.
 	ProposerSlashing(ctx context.Context, slashingRoot [32]byte) (*eth.ProposerSlashing, error)
 	AttesterSlashing(ctx context.Context, slashingRoot [32]byte) (*eth.AttesterSlashing, error)
@@ -78,6 +77,7 @@ type NoHeadAccessDatabase interface {
 	DisableSaveHotStateToDB(ctx context.Context) error
 	ForceCheckpoint(ctx context.Context, root []byte) error
 	MigrateToCold(ctx context.Context, fRoot [32]byte) error
+	ResumeStategen(ctx context.Context) (*state.BeaconState, error)
 	// Slashing operations.
 	SaveProposerSlashing(ctx context.Context, slashing *eth.ProposerSlashing) error
 	SaveAttesterSlashing(ctx context.Context, slashing *eth.AttesterSlashing) error

@@ -13,7 +13,7 @@ import (
 	"github.com/prysmaticlabs/prysm/shared/testutil/require"
 )
 
-func TestResume(t *testing.T) {
+func TestResumeStategen(t *testing.T) {
 	ctx := context.Background()
 	db, _ := testDB.SetupDB(t)
 

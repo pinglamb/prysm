@@ -409,7 +409,7 @@ func TestLastSavedState_NoSavedBlockState(t *testing.T) {
 	require.NoError(t, s.beaconDB.SaveBlock(ctx, b1))
 
 	_, err := s.lastSavedState(ctx, s.finalizedInfo.slot+1)
-	assert.ErrorContains(t, errUnknownState.Error(), err)
+	assert.ErrorContains(t, "unknown state", err)
 }
 
 // tree1 constructs the following tree:

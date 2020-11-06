@@ -221,7 +221,7 @@ func TestStateSummary_CanGetFromCacheOrDB(t *testing.T) {
 	r := [32]byte{'a'}
 	summary := &pb.StateSummary{Slot: 100}
 	_, err := service.stateSummary(ctx, r)
-	require.ErrorContains(t, errUnknownStateSummary.Error(), err)
+	require.ErrorContains(t, "unknown state summary", err)
 
 	service.stateSummaryCache.Put(r, summary)
 	got, err := service.stateSummary(ctx, r)
@@ -233,7 +233,7 @@ func TestStateSummary_CanGetFromCacheOrDB(t *testing.T) {
 	r = [32]byte{'b'}
 	summary = &pb.StateSummary{Root: r[:], Slot: 101}
 	_, err = service.stateSummary(ctx, r)
-	require.ErrorContains(t, errUnknownStateSummary.Error(), err)
+	require.ErrorContains(t, "unknown state summary", err)
 
 	require.NoError(t, service.beaconDB.SaveStateSummary(ctx, summary))
 	got, err = service.stateSummary(ctx, r)

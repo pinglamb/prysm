@@ -19,7 +19,7 @@ import (
 
 // StateByRoot retrieves the state using input block root.
 func (s *Store) StateByRoot(ctx context.Context, blockRoot [32]byte) (*state.BeaconState, error) {
-	ctx, span := trace.StartSpan(ctx, "stateGen.StateByRoot")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.StateByRoot")
 	defer span.End()
 
 	// Genesis case. If block root is zero hash, short circuit to use genesis cachedState stored in DB.
@@ -84,7 +84,7 @@ func (s *Store) StateByRootInitialSync(ctx context.Context, blockRoot [32]byte) 
 
 // StateBySlot retrieves the state using input slot.
 func (s *Store) StateBySlot(ctx context.Context, slot uint64) (*state.BeaconState, error) {
-	ctx, span := trace.StartSpan(ctx, "stateGen.StateBySlot")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.StateBySlot")
 	defer span.End()
 
 	return s.loadStateBySlot(ctx, slot)
@@ -92,7 +92,7 @@ func (s *Store) StateBySlot(ctx context.Context, slot uint64) (*state.BeaconStat
 
 // This loads a beacon state from either the cache or DB then replay blocks up the requested block root.
 func (s *Store) loadStateByRoot(ctx context.Context, blockRoot [32]byte) (*state.BeaconState, error) {
-	ctx, span := trace.StartSpan(ctx, "stateGen.loadStateByRoot")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.loadStateByRoot")
 	defer span.End()
 
 	// First, it checks if the state exists in hot state cache.
@@ -132,7 +132,7 @@ func (s *Store) loadStateByRoot(ctx context.Context, blockRoot [32]byte) (*state
 		return nil, errors.Wrap(err, "could not get ancestor state")
 	}
 	if startState == nil {
-		return nil, errUnknownBoundaryState
+		return nil, errors.New("unknown boundary state")
 	}
 
 	blks, err := s.LoadBlocks(ctx, startState.Slot()+1, targetSlot, bytesutil.ToBytes32(summary.Root))
@@ -147,7 +147,7 @@ func (s *Store) loadStateByRoot(ctx context.Context, blockRoot [32]byte) (*state
 
 // This loads a state by slot.
 func (s *Store) loadStateBySlot(ctx context.Context, slot uint64) (*state.BeaconState, error) {
-	ctx, span := trace.StartSpan(ctx, "stateGen.loadStateBySlot")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.loadStateBySlot")
 	defer span.End()
 
 	// Return genesis state if slot is 0.
@@ -523,7 +523,7 @@ func createStateIndicesFromStateSlot(ctx context.Context, slot uint64) map[strin
 // 2.) block parent state is the epoch boundary state and exists in epoch boundary cache.
 // 3.) block parent state is in DB.
 func (s *Store) lastAncestorState(ctx context.Context, root [32]byte) (*state.BeaconState, error) {
-	ctx, span := trace.StartSpan(ctx, "stateGen.lastAncestorState")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.lastAncestorState")
 	defer span.End()
 
 	if s.isFinalizedRoot(root) && s.finalizedState() != nil {
@@ -580,7 +580,7 @@ func (s *Store) lastAncestorState(ctx context.Context, root [32]byte) (*state.Be
 			return nil, err
 		}
 		if b == nil {
-			return nil, errUnknownBlock
+			return nil, errors.New("unknown block")
 		}
 	}
 }
@@ -620,13 +620,13 @@ func (s *Store) recoverStateSummary(ctx context.Context, blockRoot [32]byte) (*p
 		}
 		return summary, nil
 	}
-	return nil, errUnknownStateSummary
+	return nil, errors.New("unknown state summary")
 }
 
 // ForceCheckpoint initiates a cold state save of the given state. This method does not update the
 // "last archived state" but simply saves the specified state from the root argument into the DB.
 func (s *Store) ForceCheckpoint(ctx context.Context, root []byte) error {
-	ctx, span := trace.StartSpan(ctx, "stateGen.ForceCheckpoint")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.ForceCheckpoint")
 	defer span.End()
 
 	root32 := bytesutil.ToBytes32(root)
@@ -648,7 +648,7 @@ func (s *Store) ForceCheckpoint(ctx context.Context, root []byte) error {
 // it saves a full state. On an intermediate slot, it saves a back pointer to the
 // nearest epoch boundary state.
 func (s *Store) SaveState(ctx context.Context, state *state.BeaconState, blockRoot [32]byte) error {
-	ctx, span := trace.StartSpan(ctx, "stateGen.saveStateByRoot")
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.saveStateByRoot")
 	defer span.End()
 
 	// Duration can't be 0 to prevent panic for division.
@@ -732,4 +732,45 @@ func (s *Store) DisableSaveHotStateToDB(ctx context.Context) error {
 	s.saveHotStateDB.savedStateRoots = nil
 
 	return nil
+}
+
+// ResumeStategen resumes a new state management object from previously saved finalized check point in DB.
+func (s *Store) ResumeStategen(ctx context.Context) (*state.BeaconState, error) {
+	ctx, span := trace.StartSpan(ctx, "BeaconDB.Resume")
+	defer span.End()
+
+	c, err := s.FinalizedCheckpoint(ctx)
+	if err != nil {
+		return nil, err
+	}
+	fRoot := bytesutil.ToBytes32(c.Root)
+	// Resume as genesis state if last finalized root is zero hashes.
+	if fRoot == params.BeaconConfig().ZeroHash {
+		return s.GenesisState(ctx)
+	}
+	fState, err := s.StateByRoot(ctx, fRoot)
+	if err != nil {
+		return nil, err
+	}
+	if fState == nil {
+		return nil, errors.New("finalized state not found in disk")
+	}
+
+	s.finalizedInfo = &finalizedInfo{slot: fState.Slot(), root: fRoot, state: fState.Copy()}
+
+	return fState, nil
+}
+
+// Returns true if input root equals to cached finalized root.
+func (s *Store) isFinalizedRoot(r [32]byte) bool {
+	s.finalizedInfo.lock.RLock()
+	defer s.finalizedInfo.lock.RUnlock()
+	return r == s.finalizedInfo.root
+}
+
+// Returns the cached and copied finalized state.
+func (s *Store) finalizedState() *state.BeaconState {
+	s.finalizedInfo.lock.RLock()
+	defer s.finalizedInfo.lock.RUnlock()
+	return s.finalizedInfo.state.Copy()
 }

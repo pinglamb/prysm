@@ -363,13 +363,15 @@ func (s *Service) saveGenesisData(ctx context.Context, genesisState *stateTrie.B
 		return err
 	}
 
-	s.beaconDB.SaveFinalizedState(0, genesisBlkRoot, genesisState)
-
 	if err := s.beaconDB.SaveHeadBlockRoot(ctx, genesisBlkRoot); err != nil {
 		return errors.Wrap(err, "could not save head block root")
 	}
 	if err := s.beaconDB.SaveGenesisBlockRoot(ctx, genesisBlkRoot); err != nil {
 		return errors.Wrap(err, "could not save genesis block root")
+	}
+
+	if _, err := s.beaconDB.ResumeStategen(ctx); err != nil {
+		return err
 	}
 
 	// Finalized checkpoint at genesis is a zero hash.
@@ -423,7 +425,7 @@ func (s *Service) initializeChainInfo(ctx context.Context) error {
 		if err != nil {
 			return errors.Wrap(err, "could not hash head block")
 		}
-		finalizedState, err := s.beaconDB.Resume(ctx)
+		finalizedState, err := s.beaconDB.ResumeStategen(ctx)
 		if err != nil {
 			return errors.Wrap(err, "could not get finalized state from db")
 		}
@@ -449,7 +451,7 @@ func (s *Service) initializeChainInfo(ctx context.Context) error {
 	finalizedRoot := s.ensureRootNotZeros(bytesutil.ToBytes32(finalized.Root))
 	var finalizedState *stateTrie.BeaconState
 
-	finalizedState, err = s.beaconDB.Resume(ctx)
+	finalizedState, err = s.beaconDB.ResumeStategen(ctx)
 	if err != nil {
 		return errors.Wrap(err, "could not get finalized state from db")
 	}
