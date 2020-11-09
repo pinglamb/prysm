@@ -10,7 +10,6 @@ import (
 	ethpb "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
 	mock "github.com/prysmaticlabs/prysm/beacon-chain/blockchain/testing"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/beacon-chain/db/kv"
 	dbTest "github.com/prysmaticlabs/prysm/beacon-chain/db/testing"
 	stateTrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
 	pbp2p "github.com/prysmaticlabs/prysm/proto/beacon/p2p/v1"
@@ -23,7 +22,7 @@ import (
 )
 
 func TestServer_ListBeaconCommittees_CurrentEpoch(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	helpers.ClearCache()
 
 	numValidators := 128
@@ -36,7 +35,6 @@ func TestServer_ListBeaconCommittees_CurrentEpoch(t *testing.T) {
 	bs := &Server{
 		HeadFetcher:        m,
 		GenesisTimeFetcher: m,
-		StateGen:           stategen.New(db, sc),
 	}
 	b := testutil.NewBeaconBlock()
 	require.NoError(t, db.SaveBlock(ctx, b))
@@ -97,7 +95,6 @@ func TestServer_ListBeaconCommittees_PreviousEpoch(t *testing.T) {
 	bs := &Server{
 		HeadFetcher:        m,
 		GenesisTimeFetcher: m,
-		StateGen:           stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	activeIndices, err := helpers.ActiveValidatorIndices(headState, 1)
@@ -137,7 +134,7 @@ func TestServer_ListBeaconCommittees_PreviousEpoch(t *testing.T) {
 
 func TestRetrieveCommitteesForRoot(t *testing.T) {
 
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	helpers.ClearCache()
 	ctx := context.Background()
 
@@ -150,7 +147,6 @@ func TestRetrieveCommitteesForRoot(t *testing.T) {
 	bs := &Server{
 		HeadFetcher:        m,
 		GenesisTimeFetcher: m,
-		StateGen:           stategen.New(db, sc),
 	}
 	b := testutil.NewBeaconBlock()
 	require.NoError(t, db.SaveBlock(ctx, b))

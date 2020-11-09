@@ -15,7 +15,6 @@ import (
 	blockfeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/block"
 	statefeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/beacon-chain/db/kv"
 	dbTest "github.com/prysmaticlabs/prysm/beacon-chain/db/testing"
 	stateTrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
 	pbp2p "github.com/prysmaticlabs/prysm/proto/beacon/p2p/v1"
@@ -629,14 +628,13 @@ func TestServer_GetWeakSubjectivityCheckpoint(t *testing.T) {
 		BlockNotifier: chainService.BlockNotifier(),
 		HeadFetcher:   chainService,
 		BeaconDB:      db,
-		StateGen:      stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	c, err := server.GetWeakSubjectivityCheckpoint(ctx, &ptypes.Empty{})
 	require.NoError(t, err)
 	e := uint64(256)
 	require.Equal(t, e, c.Epoch)
-	wsState, err := server.StateGen.StateBySlot(ctx, e*params.BeaconConfig().SlotsPerEpoch)
+	wsState, err := server.BeaconDB.StateBySlot(ctx, e*params.BeaconConfig().SlotsPerEpoch)
 	require.NoError(t, err)
 	sRoot, err := wsState.HashTreeRoot(ctx)
 	require.NoError(t, err)

@@ -20,12 +20,11 @@ import (
 
 func TestStore_OnAttestation(t *testing.T) {
 	ctx := context.Background()
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 
 	cfg := &Config{
 		BeaconDB:        db,
 		ForkChoiceStore: protoarray.New(0, 0, [32]byte{}),
-		StateGen:        stategen.New(db, sc),
 	}
 	service, err := NewService(ctx, cfg)
 	require.NoError(t, err)
@@ -129,11 +128,10 @@ func TestStore_OnAttestation(t *testing.T) {
 
 func TestStore_SaveCheckpointState(t *testing.T) {
 	ctx := context.Background()
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 
 	cfg := &Config{
 		BeaconDB: db,
-		StateGen: stategen.New(db, sc),
 	}
 	service, err := NewService(ctx, cfg)
 	require.NoError(t, err)
@@ -200,11 +198,10 @@ func TestStore_SaveCheckpointState(t *testing.T) {
 
 func TestStore_UpdateCheckpointState(t *testing.T) {
 	ctx := context.Background()
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 
 	cfg := &Config{
 		BeaconDB: db,
-		StateGen: stategen.New(db, sc),
 	}
 	service, err := NewService(ctx, cfg)
 	require.NoError(t, err)

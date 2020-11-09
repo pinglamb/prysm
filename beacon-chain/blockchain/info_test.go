@@ -19,7 +19,7 @@ func TestService_TreeHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	db, sCache := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 	headState := testutil.NewBeaconState()
 	require.NoError(t, headState.SetBalances([]uint64{params.BeaconConfig().GweiPerEth}))
 	cfg := &Config{
@@ -29,7 +29,6 @@ func TestService_TreeHandler(t *testing.T) {
 			0, // finalizedEpoch
 			[32]byte{'a'},
 		),
-		StateGen: stategen.New(db, sCache),
 	}
 	s, err := NewService(ctx, cfg)
 	require.NoError(t, err)

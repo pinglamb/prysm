@@ -47,18 +47,17 @@ func TestServer_GetBlock(t *testing.T) {
 }
 
 func TestServer_GetAttestationInclusionSlot(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	ctx := context.Background()
 	bs := &Server{
 		BeaconDB: db,
-		StateGen: stategen.New(db, sc),
 		GenesisTimeFetcher: &mock.ChainService{Genesis: time.Now().Add(time.Duration(-1*int64(
 			2*params.BeaconConfig().SlotsPerEpoch*params.BeaconConfig().SecondsPerSlot)) * time.Second)},
 	}
 
 	s, _ := testutil.DeterministicGenesisState(t, 2048)
 	tr := [32]byte{'a'}
-	require.NoError(t, bs.BeaconDB.SaveStateByRoot(ctx, tr, s))
+	require.NoError(t, bs.BeaconDB.SaveState(ctx, s, tr))
 	c, err := helpers.BeaconCommitteeFromState(s, 1, 0)
 	require.NoError(t, err)
 

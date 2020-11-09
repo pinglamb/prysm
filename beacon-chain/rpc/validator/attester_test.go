@@ -353,7 +353,7 @@ func TestServer_GetAttestationData_HeadStateSlotGreaterThanRequestSlot(t *testin
 	// attestation is referencing be less than or equal to the attestation data slot.
 	// See: https://github.com/prysmaticlabs/prysm/issues/5164
 	ctx := context.Background()
-	db, sc := dbutil.SetupDB(t)
+	db, _ := dbutil.SetupDB(t)
 
 	slot := 3*params.BeaconConfig().SlotsPerEpoch + 1
 	block := testutil.NewBeaconBlock()
@@ -410,7 +410,6 @@ func TestServer_GetAttestationData_HeadStateSlotGreaterThanRequestSlot(t *testin
 		FinalizationFetcher: &mock.ChainService{CurrentJustifiedCheckPoint: beaconState.CurrentJustifiedCheckpoint()},
 		GenesisTimeFetcher:  &mock.ChainService{Genesis: time.Now().Add(time.Duration(-1*int64(slot*params.BeaconConfig().SecondsPerSlot)) * time.Second)},
 		StateNotifier:       chainService.StateNotifier(),
-		StateGen:            stategen.New(db, sc),
 	}
 	require.NoError(t, db.SaveState(ctx, beaconState, blockRoot))
 	require.NoError(t, db.SaveBlock(ctx, block))

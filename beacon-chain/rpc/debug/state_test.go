@@ -14,7 +14,7 @@ import (
 
 func TestServer_GetBeaconState(t *testing.T) {
 
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	ctx := context.Background()
 	st := testutil.NewBeaconState()
 	slot := uint64(100)
@@ -24,12 +24,10 @@ func TestServer_GetBeaconState(t *testing.T) {
 	require.NoError(t, db.SaveBlock(ctx, b))
 	gRoot, err := b.Block.HashTreeRoot()
 	require.NoError(t, err)
-	gen := stategen.New(db, sc)
-	require.NoError(t, gen.SaveState(ctx, gRoot, st))
 	require.NoError(t, db.SaveState(ctx, st, gRoot))
 	bs := &Server{
-		StateGen:           gen,
 		GenesisTimeFetcher: &mock.ChainService{},
+		BeaconDB:           db,
 	}
 	_, err = bs.GetBeaconState(ctx, &pbrpc.BeaconStateRequest{})
 	assert.ErrorContains(t, "Need to specify either a block root or slot to request state", err)

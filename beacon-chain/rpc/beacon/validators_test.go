@@ -17,7 +17,6 @@ import (
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/epoch/precompute"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/beacon-chain/db"
-	"github.com/prysmaticlabs/prysm/beacon-chain/db/kv"
 	dbTest "github.com/prysmaticlabs/prysm/beacon-chain/db/testing"
 	stateTrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
 	mockSync "github.com/prysmaticlabs/prysm/beacon-chain/sync/initial-sync/testing"
@@ -82,14 +81,13 @@ func TestServer_ListValidatorBalances_CannotRequestFutureEpoch(t *testing.T) {
 }
 
 func TestServer_ListValidatorBalances_NoResults(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 
 	ctx := context.Background()
 	st := testutil.NewBeaconState()
 	require.NoError(t, st.SetSlot(0))
 	bs := &Server{
 		GenesisTimeFetcher: &mock.ChainService{},
-		StateGen:           stategen.New(db, sc),
 	}
 
 	headState := testutil.NewBeaconState()
@@ -120,7 +118,7 @@ func TestServer_ListValidatorBalances_NoResults(t *testing.T) {
 }
 
 func TestServer_ListValidatorBalances_DefaultResponse_NoArchive(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	ctx := context.Background()
 
 	numItems := 100
@@ -152,7 +150,6 @@ func TestServer_ListValidatorBalances_DefaultResponse_NoArchive(t *testing.T) {
 	require.NoError(t, db.SaveState(ctx, st, gRoot))
 	bs := &Server{
 		GenesisTimeFetcher: &mock.ChainService{},
-		StateGen:           stategen.New(db, sc),
 		HeadFetcher: &mock.ChainService{
 			State: st,
 		},
@@ -168,7 +165,7 @@ func TestServer_ListValidatorBalances_DefaultResponse_NoArchive(t *testing.T) {
 }
 
 func TestServer_ListValidatorBalances_PaginationOutOfRange(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	ctx := context.Background()
 
 	_, _, headState := setupValidators(t, db, 100)
@@ -180,7 +177,6 @@ func TestServer_ListValidatorBalances_PaginationOutOfRange(t *testing.T) {
 
 	bs := &Server{
 		GenesisTimeFetcher: &mock.ChainService{},
-		StateGen:           stategen.New(db, sc),
 		HeadFetcher: &mock.ChainService{
 			State: headState,
 		},
@@ -216,7 +212,7 @@ func pubKey(i uint64) []byte {
 }
 
 func TestServer_ListValidatorBalances_Pagination_Default(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	ctx := context.Background()
 
 	_, _, headState := setupValidators(t, db, 100)
@@ -228,7 +224,6 @@ func TestServer_ListValidatorBalances_Pagination_Default(t *testing.T) {
 
 	bs := &Server{
 		GenesisTimeFetcher: &mock.ChainService{},
-		StateGen:           stategen.New(db, sc),
 		HeadFetcher: &mock.ChainService{
 			State: headState,
 		},
@@ -298,7 +293,7 @@ func TestServer_ListValidatorBalances_Pagination_Default(t *testing.T) {
 }
 
 func TestServer_ListValidatorBalances_Pagination_CustomPageSizes(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	ctx := context.Background()
 
 	count := 1000
@@ -311,7 +306,6 @@ func TestServer_ListValidatorBalances_Pagination_CustomPageSizes(t *testing.T) {
 
 	bs := &Server{
 		GenesisTimeFetcher: &mock.ChainService{},
-		StateGen:           stategen.New(db, sc),
 		HeadFetcher: &mock.ChainService{
 			State: headState,
 		},
@@ -366,7 +360,7 @@ func TestServer_ListValidatorBalances_Pagination_CustomPageSizes(t *testing.T) {
 }
 
 func TestServer_ListValidatorBalances_ResponseOutOfBound(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	ctx := context.Background()
 
 	count := 10
@@ -379,7 +373,6 @@ func TestServer_ListValidatorBalances_ResponseOutOfBound(t *testing.T) {
 
 	bs := &Server{
 		GenesisTimeFetcher: &mock.ChainService{},
-		StateGen:           stategen.New(db, sc),
 		HeadFetcher: &mock.ChainService{
 			State: headState,
 		},
@@ -391,7 +384,7 @@ func TestServer_ListValidatorBalances_ResponseOutOfBound(t *testing.T) {
 }
 
 func TestServer_ListValidatorBalances_OutOfRange(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 
 	ctx := context.Background()
 	_, _, headState := setupValidators(t, db, 1)
@@ -403,7 +396,6 @@ func TestServer_ListValidatorBalances_OutOfRange(t *testing.T) {
 
 	bs := &Server{
 		GenesisTimeFetcher: &mock.ChainService{},
-		StateGen:           stategen.New(db, sc),
 		HeadFetcher: &mock.ChainService{
 			State: headState,
 		},
@@ -462,7 +454,6 @@ func TestServer_ListValidators_NoResults(t *testing.T) {
 		HeadFetcher: &mock.ChainService{
 			State: st,
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 	wanted := &ethpb.Validators{
 		ValidatorList: make([]*ethpb.Validators_ValidatorContainer, 0),
@@ -528,7 +519,6 @@ func TestServer_ListValidators_OnlyActiveValidators(t *testing.T) {
 			// We are in epoch 0.
 			Genesis: time.Now(),
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	b := testutil.NewBeaconBlock()
@@ -595,7 +585,6 @@ func TestServer_ListValidators_InactiveInTheMiddle(t *testing.T) {
 			// We are in epoch 0.
 			Genesis: time.Now(),
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	b := testutil.NewBeaconBlock()
@@ -639,7 +628,6 @@ func TestServer_ListValidators_NoPagination(t *testing.T) {
 				Epoch: 0,
 			},
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	received, err := bs.ListValidators(context.Background(), &ethpb.ListValidatorsRequest{})
@@ -705,7 +693,6 @@ func TestServer_ListValidators_IndicesPubKeys(t *testing.T) {
 			// We are in epoch 0.
 			Genesis: time.Now(),
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	pubKeysWanted := make([][]byte, len(pubkeyIndicesWanted))
@@ -741,7 +728,6 @@ func TestServer_ListValidators_Pagination(t *testing.T) {
 			// We are in epoch 0.
 			Genesis: time.Now(),
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	tests := []struct {
@@ -878,7 +864,6 @@ func TestServer_ListValidators_PaginationOutOfRange(t *testing.T) {
 			// We are in epoch 0.
 			Genesis: time.Now(),
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	req := &ethpb.ListValidatorsRequest{PageToken: strconv.Itoa(1), PageSize: 100}
@@ -922,7 +907,6 @@ func TestServer_ListValidators_DefaultPageSize(t *testing.T) {
 			// We are in epoch 0.
 			Genesis: time.Now(),
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	req := &ethpb.ListValidatorsRequest{}
@@ -973,7 +957,6 @@ func TestServer_ListValidators_FromOldEpoch(t *testing.T) {
 			// We are in epoch 30
 			Genesis: time.Now().Add(time.Duration(-1*int64(30*secondsPerEpoch)) * time.Second),
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	req := &ethpb.ListValidatorsRequest{
@@ -1040,7 +1023,6 @@ func TestServer_ListValidators_ProcessHeadStateSlots(t *testing.T) {
 		GenesisTimeFetcher: &mock.ChainService{
 			Genesis: time.Now().Add(time.Duration(-1*int64(secondsPerEpoch)) * time.Second),
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	req := &ethpb.ListValidatorsRequest{
@@ -1137,7 +1119,7 @@ func TestServer_GetValidator(t *testing.T) {
 }
 
 func TestServer_GetValidatorActiveSetChanges(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 
 	ctx := context.Background()
 	validators := make([]*ethpb.Validator, 8)
@@ -1191,7 +1173,6 @@ func TestServer_GetValidatorActiveSetChanges(t *testing.T) {
 			FinalizedCheckPoint: &ethpb.Checkpoint{Epoch: 0, Root: make([]byte, 32)},
 		},
 		GenesisTimeFetcher: &mock.ChainService{},
-		StateGen:           stategen.New(db, sc),
 	}
 	res, err := bs.GetValidatorActiveSetChanges(ctx, &ethpb.GetValidatorActiveSetChangesRequest{
 		QueryFilter: &ethpb.GetValidatorActiveSetChangesRequest_Genesis{Genesis: true},
@@ -1393,7 +1374,6 @@ func TestServer_GetValidatorParticipation_CannotRequestFutureEpoch(t *testing.T)
 			State: headState,
 		},
 		GenesisTimeFetcher: &mock.ChainService{},
-		StateGen:           stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	wanted := "Cannot retrieve information about an epoch"
@@ -1424,7 +1404,6 @@ func TestServer_GetValidatorParticipation_UnknownState(t *testing.T) {
 		GenesisTimeFetcher: &mock.ChainService{
 			Genesis: time.Now().Add(time.Duration(-1*int64(slots)) * time.Second),
 		},
-		StateGen: stategen.New(db, kv.NewStateSummaryCache()),
 	}
 
 	wanted := "Could not get state: unknown state"
@@ -1440,7 +1419,7 @@ func TestServer_GetValidatorParticipation_UnknownState(t *testing.T) {
 }
 
 func TestServer_GetValidatorParticipation_CurrentAndPrevEpoch(t *testing.T) {
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 
 	ctx := context.Background()
 	validatorCount := uint64(100)
@@ -1490,7 +1469,6 @@ func TestServer_GetValidatorParticipation_CurrentAndPrevEpoch(t *testing.T) {
 	bs := &Server{
 		BeaconDB:    db,
 		HeadFetcher: m,
-		StateGen:    stategen.New(db, sc),
 		GenesisTimeFetcher: &mock.ChainService{
 			Genesis: time.Now(),
 		},
@@ -1795,7 +1773,7 @@ func TestServer_GetIndividualVotes_ValidatorsDontExist(t *testing.T) {
 
 	params.UseMinimalConfig()
 	defer params.UseMainnetConfig()
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	ctx := context.Background()
 
 	validators := uint64(64)
@@ -1809,12 +1787,9 @@ func TestServer_GetIndividualVotes_ValidatorsDontExist(t *testing.T) {
 	require.NoError(t, db.SaveBlock(ctx, b))
 	gRoot, err := b.Block.HashTreeRoot()
 	require.NoError(t, err)
-	gen := stategen.New(db, sc)
-	require.NoError(t, gen.SaveState(ctx, gRoot, beaconState))
 	require.NoError(t, db.SaveState(ctx, beaconState, gRoot))
 	require.NoError(t, db.SaveGenesisBlockRoot(ctx, gRoot))
 	bs := &Server{
-		StateGen:           gen,
 		GenesisTimeFetcher: &mock.ChainService{},
 	}
 
@@ -1867,7 +1842,7 @@ func TestServer_GetIndividualVotes_Working(t *testing.T) {
 
 	params.UseMinimalConfig()
 	defer params.UseMainnetConfig()
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	ctx := context.Background()
 
 	validators := uint64(64)
@@ -1904,12 +1879,9 @@ func TestServer_GetIndividualVotes_Working(t *testing.T) {
 	require.NoError(t, db.SaveBlock(ctx, b))
 	gRoot, err := b.Block.HashTreeRoot()
 	require.NoError(t, err)
-	gen := stategen.New(db, sc)
-	require.NoError(t, gen.SaveState(ctx, gRoot, beaconState))
 	require.NoError(t, db.SaveState(ctx, beaconState, gRoot))
 	require.NoError(t, db.SaveGenesisBlockRoot(ctx, gRoot))
 	bs := &Server{
-		StateGen:           gen,
 		GenesisTimeFetcher: &mock.ChainService{},
 	}
 

@@ -528,7 +528,7 @@ func TestServer_mapAttestationToTargetRoot(t *testing.T) {
 
 func TestServer_ListIndexedAttestations_GenesisEpoch(t *testing.T) {
 	params.UseMainnetConfig()
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	helpers.ClearCache()
 	ctx := context.Background()
 	targetRoot1 := bytesutil.ToBytes32([]byte("root"))
@@ -599,7 +599,6 @@ func TestServer_ListIndexedAttestations_GenesisEpoch(t *testing.T) {
 		BeaconDB:           db,
 		GenesisTimeFetcher: &chainMock.ChainService{State: state},
 		HeadFetcher:        &chainMock.ChainService{State: state},
-		StateGen:           stategen.New(db, sc),
 	}
 	err := db.SaveStateSummary(ctx, &pbp2p.StateSummary{
 		Root: targetRoot1[:],
@@ -629,7 +628,7 @@ func TestServer_ListIndexedAttestations_GenesisEpoch(t *testing.T) {
 func TestServer_ListIndexedAttestations_OldEpoch(t *testing.T) {
 	params.SetupTestConfigCleanup(t)
 	params.OverrideBeaconConfig(params.MainnetConfig())
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	helpers.ClearCache()
 	ctx := context.Background()
 
@@ -692,7 +691,6 @@ func TestServer_ListIndexedAttestations_OldEpoch(t *testing.T) {
 		GenesisTimeFetcher: &chainMock.ChainService{
 			Genesis: time.Now(),
 		},
-		StateGen: stategen.New(db, sc),
 	}
 	err = db.SaveStateSummary(ctx, &pbp2p.StateSummary{
 		Root: blockRoot[:],
@@ -876,7 +874,7 @@ func TestServer_StreamIndexedAttestations_ContextCanceled(t *testing.T) {
 func TestServer_StreamIndexedAttestations_OK(t *testing.T) {
 	params.SetupTestConfigCleanup(t)
 	params.OverrideBeaconConfig(params.MainnetConfig())
-	db, sc := dbTest.SetupDB(t)
+	db, _ := dbTest.SetupDB(t)
 	exitRoutine := make(chan bool)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -963,7 +961,6 @@ func TestServer_StreamIndexedAttestations_OK(t *testing.T) {
 		},
 		AttestationNotifier:         chainService.OperationNotifier(),
 		CollectedAttestationsBuffer: make(chan []*ethpb.Attestation, 1),
-		StateGen:                    stategen.New(db, sc),
 	}
 
 	for dataRoot, sameDataAtts := range atts {

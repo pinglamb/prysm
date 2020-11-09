@@ -145,7 +145,6 @@ func TestValidateBeaconBlockPubSub_ValidProposerSignature(t *testing.T) {
 	require.NoError(t, err)
 	c2, err := lru.New(10)
 	require.NoError(t, err)
-	stateGen := stategen.New(db, stateSummaryCache)
 	chainService := &mock.ChainService{Genesis: time.Unix(time.Now().Unix()-int64(params.BeaconConfig().SecondsPerSlot), 0),
 		State: beaconState,
 		FinalizedCheckPoint: &ethpb.Checkpoint{
@@ -164,7 +163,6 @@ func TestValidateBeaconBlockPubSub_ValidProposerSignature(t *testing.T) {
 		slotToPendingBlocks: make(map[uint64][]*ethpb.SignedBeaconBlock),
 		seenPendingBlocks:   make(map[[32]byte]bool),
 		stateSummaryCache:   stateSummaryCache,
-		stateGen:            stateGen,
 	}
 	buf := new(bytes.Buffer)
 	_, err = p.Encoding().EncodeGossip(buf, msg)
@@ -210,7 +208,6 @@ func TestValidateBeaconBlockPubSub_AdvanceEpochsForState(t *testing.T) {
 	require.NoError(t, err)
 	c2, err := lru.New(10)
 	require.NoError(t, err)
-	stateGen := stategen.New(db, stateSummaryCache)
 	chainService := &mock.ChainService{Genesis: time.Unix(time.Now().Unix()-int64(blkSlot*params.BeaconConfig().SecondsPerSlot), 0),
 		State: beaconState,
 		FinalizedCheckPoint: &ethpb.Checkpoint{
@@ -227,7 +224,6 @@ func TestValidateBeaconBlockPubSub_AdvanceEpochsForState(t *testing.T) {
 		slotToPendingBlocks: make(map[uint64][]*ethpb.SignedBeaconBlock),
 		seenPendingBlocks:   make(map[[32]byte]bool),
 		stateSummaryCache:   stateSummaryCache,
-		stateGen:            stateGen,
 	}
 	buf := new(bytes.Buffer)
 	_, err = p.Encoding().EncodeGossip(buf, msg)
@@ -523,7 +519,6 @@ func TestValidateBeaconBlockPubSub_ParentNotFinalizedDescendant(t *testing.T) {
 	require.NoError(t, err)
 	c2, err := lru.New(10)
 	require.NoError(t, err)
-	stateGen := stategen.New(db, stateSummaryCache)
 	chainService := &mock.ChainService{Genesis: time.Unix(time.Now().Unix()-int64(params.BeaconConfig().SecondsPerSlot), 0),
 		State: beaconState,
 		FinalizedCheckPoint: &ethpb.Checkpoint{
@@ -543,7 +538,6 @@ func TestValidateBeaconBlockPubSub_ParentNotFinalizedDescendant(t *testing.T) {
 		slotToPendingBlocks: make(map[uint64][]*ethpb.SignedBeaconBlock),
 		seenPendingBlocks:   make(map[[32]byte]bool),
 		stateSummaryCache:   stateSummaryCache,
-		stateGen:            stateGen,
 	}
 	buf := new(bytes.Buffer)
 	_, err = p.Encoding().EncodeGossip(buf, msg)
@@ -590,7 +584,6 @@ func TestValidateBeaconBlockPubSub_InvalidParentBlock(t *testing.T) {
 	require.NoError(t, err)
 	c2, err := lru.New(10)
 	require.NoError(t, err)
-	stateGen := stategen.New(db, stateSummaryCache)
 	chainService := &mock.ChainService{Genesis: time.Unix(time.Now().Unix()-int64(params.BeaconConfig().SecondsPerSlot), 0),
 		State: beaconState,
 		FinalizedCheckPoint: &ethpb.Checkpoint{
@@ -607,7 +600,6 @@ func TestValidateBeaconBlockPubSub_InvalidParentBlock(t *testing.T) {
 		slotToPendingBlocks: make(map[uint64][]*ethpb.SignedBeaconBlock),
 		seenPendingBlocks:   make(map[[32]byte]bool),
 		stateSummaryCache:   stateSummaryCache,
-		stateGen:            stateGen,
 	}
 	buf := new(bytes.Buffer)
 	_, err = p.Encoding().EncodeGossip(buf, msg)
@@ -689,7 +681,6 @@ func TestValidateBeaconBlockPubSub_RejectEvilBlocksFromFuture(t *testing.T) {
 	c2, err := lru.New(10)
 	require.NoError(t, err)
 
-	stateGen := stategen.New(db, stateSummaryCache)
 	chainService := &mock.ChainService{
 		Genesis: time.Unix(genesisTime.Unix()-int64(slotsSinceGenesis*perSlot), 0),
 		FinalizedCheckPoint: &ethpb.Checkpoint{
@@ -707,7 +698,6 @@ func TestValidateBeaconBlockPubSub_RejectEvilBlocksFromFuture(t *testing.T) {
 		slotToPendingBlocks: make(map[uint64][]*ethpb.SignedBeaconBlock),
 		seenPendingBlocks:   make(map[[32]byte]bool),
 		stateSummaryCache:   stateSummaryCache,
-		stateGen:            stateGen,
 	}
 
 	buf := new(bytes.Buffer)

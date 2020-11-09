@@ -11,7 +11,6 @@ import (
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/blocks"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/db"
-	"github.com/prysmaticlabs/prysm/beacon-chain/db/kv"
 	testDB "github.com/prysmaticlabs/prysm/beacon-chain/db/testing"
 	"github.com/prysmaticlabs/prysm/beacon-chain/forkchoice/protoarray"
 	stateTrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
@@ -27,11 +26,10 @@ import (
 
 func TestStore_OnBlock(t *testing.T) {
 	ctx := context.Background()
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 
 	cfg := &Config{
 		BeaconDB:        db,
-		StateGen:        stategen.New(db, sc),
 		ForkChoiceStore: protoarray.New(0, 0, [32]byte{}),
 	}
 	service, err := NewService(ctx, cfg)
@@ -122,11 +120,10 @@ func TestStore_OnBlock(t *testing.T) {
 
 func TestStore_OnBlockBatch(t *testing.T) {
 	ctx := context.Background()
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 
 	cfg := &Config{
 		BeaconDB: db,
-		StateGen: stategen.New(db, sc),
 	}
 	service, err := NewService(ctx, cfg)
 	require.NoError(t, err)
@@ -166,7 +163,7 @@ func TestStore_OnBlockBatch(t *testing.T) {
 
 	blks[0].Block.ParentRoot = gRoot[:]
 	require.NoError(t, db.SaveBlock(context.Background(), blks[0]))
-	require.NoError(t, service.stateGen.SaveState(ctx, blkRoots[0], firstState))
+	require.NoError(t, service.beaconDB.SaveState(ctx, firstState, blkRoots[0]))
 	_, _, err = service.onBlockBatch(ctx, blks[1:], blkRoots[1:])
 	require.NoError(t, err)
 }
@@ -236,11 +233,10 @@ func TestShouldUpdateJustified_ReturnFalse(t *testing.T) {
 
 func TestCachedPreState_CanGetFromStateSummary(t *testing.T) {
 	ctx := context.Background()
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 
 	cfg := &Config{
 		BeaconDB: db,
-		StateGen: stategen.New(db, sc),
 	}
 	service, err := NewService(ctx, cfg)
 	require.NoError(t, err)
@@ -263,17 +259,16 @@ func TestCachedPreState_CanGetFromStateSummary(t *testing.T) {
 	b.Block.Slot = 1
 	b.Block.ParentRoot = gRoot[:]
 	require.NoError(t, service.beaconDB.SaveStateSummary(ctx, &pb.StateSummary{Slot: 1, Root: gRoot[:]}))
-	require.NoError(t, service.stateGen.SaveState(ctx, gRoot, s))
+	require.NoError(t, service.beaconDB.SaveState(ctx, s, gRoot))
 	require.NoError(t, service.verifyBlkPreState(ctx, b.Block))
 }
 
 func TestCachedPreState_CanGetFromDB(t *testing.T) {
 	ctx := context.Background()
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 
 	cfg := &Config{
 		BeaconDB: db,
-		StateGen: stategen.New(db, sc),
 	}
 	service, err := NewService(ctx, cfg)
 	require.NoError(t, err)
@@ -300,7 +295,7 @@ func TestCachedPreState_CanGetFromDB(t *testing.T) {
 	s, err := stateTrie.InitializeFromProto(&pb.BeaconState{Slot: 1})
 	require.NoError(t, err)
 	require.NoError(t, service.beaconDB.SaveStateSummary(ctx, &pb.StateSummary{Slot: 1, Root: gRoot[:]}))
-	require.NoError(t, service.stateGen.SaveState(ctx, gRoot, s))
+	require.NoError(t, service.beaconDB.SaveState(ctx, s, gRoot))
 	require.NoError(t, service.verifyBlkPreState(ctx, b.Block))
 }
 
@@ -308,7 +303,7 @@ func TestUpdateJustified_CouldUpdateBest(t *testing.T) {
 	ctx := context.Background()
 	db, _ := testDB.SetupDB(t)
 
-	cfg := &Config{BeaconDB: db, StateGen: stategen.New(db, kv.NewStateSummaryCache())}
+	cfg := &Config{BeaconDB: db}
 	service, err := NewService(ctx, cfg)
 	require.NoError(t, err)
 
@@ -701,7 +696,7 @@ func TestEnsureRootNotZeroHashes(t *testing.T) {
 }
 
 func TestFinalizedImpliesNewJustified(t *testing.T) {
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 	ctx := context.Background()
 	type args struct {
 		cachedCheckPoint        *ethpb.Checkpoint
@@ -742,7 +737,7 @@ func TestFinalizedImpliesNewJustified(t *testing.T) {
 	for _, test := range tests {
 		beaconState := testutil.NewBeaconState()
 		require.NoError(t, beaconState.SetCurrentJustifiedCheckpoint(test.args.stateCheckPoint))
-		service, err := NewService(ctx, &Config{BeaconDB: db, StateGen: stategen.New(db, sc), ForkChoiceStore: protoarray.New(0, 0, [32]byte{})})
+		service, err := NewService(ctx, &Config{BeaconDB: db, ForkChoiceStore: protoarray.New(0, 0, [32]byte{})})
 		require.NoError(t, err)
 		service.justifiedCheckpt = test.args.cachedCheckPoint
 		require.NoError(t, service.beaconDB.SaveStateSummary(ctx, &pb.StateSummary{Root: bytesutil.PadTo(test.want.Root, 32)}))
@@ -776,7 +771,7 @@ func TestFinalizedImpliesNewJustified(t *testing.T) {
 }
 
 func TestVerifyBlkDescendant(t *testing.T) {
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 	ctx := context.Background()
 
 	b := testutil.NewBeaconBlock()
@@ -834,7 +829,7 @@ func TestVerifyBlkDescendant(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		service, err := NewService(ctx, &Config{BeaconDB: db, StateGen: stategen.New(db, sc), ForkChoiceStore: protoarray.New(0, 0, [32]byte{})})
+		service, err := NewService(ctx, &Config{BeaconDB: db, ForkChoiceStore: protoarray.New(0, 0, [32]byte{})})
 		require.NoError(t, err)
 		service.finalizedCheckpt = &ethpb.Checkpoint{
 			Root: tt.args.finalizedRoot[:],

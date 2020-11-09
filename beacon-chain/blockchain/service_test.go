@@ -111,13 +111,12 @@ func setupBeaconChain(t *testing.T, beaconDB db.Database, sc *kv.StateSummaryCac
 		P2p:               &mockBroadcaster{},
 		StateNotifier:     &mockBeaconNode{},
 		AttPool:           attestations.NewPool(),
-		StateGen:          stategen.New(beaconDB, sc),
 		ForkChoiceStore:   protoarray.New(0, 0, params.BeaconConfig().ZeroHash),
 		OpsService:        opsService,
 	}
 
 	// Safe a state in stategen to purposes of testing a service stop / shutdown.
-	require.NoError(t, cfg.StateGen.SaveState(ctx, bytesutil.ToBytes32(bState.FinalizedCheckpoint().Root), bState))
+	require.NoError(t, cfg.BeaconDB.SaveState(ctx, bState, bytesutil.ToBytes32(bState.FinalizedCheckpoint().Root)))
 
 	chainService, err := NewService(ctx, cfg)
 	require.NoError(t, err, "Unable to setup chain service")
@@ -252,7 +251,7 @@ func TestChainService_CorrectGenesisRoots(t *testing.T) {
 }
 
 func TestChainService_InitializeChainInfo(t *testing.T) {
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 	ctx := context.Background()
 
 	genesis := testutil.NewBeaconBlock()
@@ -274,7 +273,7 @@ func TestChainService_InitializeChainInfo(t *testing.T) {
 	require.NoError(t, db.SaveState(ctx, headState, genesisRoot))
 	require.NoError(t, db.SaveBlock(ctx, headBlock))
 	require.NoError(t, db.SaveFinalizedCheckpoint(ctx, &ethpb.Checkpoint{Epoch: helpers.SlotToEpoch(finalizedSlot), Root: headRoot[:]}))
-	c := &Service{beaconDB: db, stateGen: stategen.New(db, sc)}
+	c := &Service{beaconDB: db}
 	require.NoError(t, c.initializeChainInfo(ctx))
 	headBlk, err := c.HeadBlock(ctx)
 	require.NoError(t, err)
@@ -292,7 +291,7 @@ func TestChainService_InitializeChainInfo(t *testing.T) {
 }
 
 func TestChainService_InitializeChainInfo_SetHeadAtGenesis(t *testing.T) {
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 	ctx := context.Background()
 
 	genesis := testutil.NewBeaconBlock()
@@ -313,7 +312,7 @@ func TestChainService_InitializeChainInfo_SetHeadAtGenesis(t *testing.T) {
 	require.NoError(t, db.SaveState(ctx, headState, headRoot))
 	require.NoError(t, db.SaveState(ctx, headState, genesisRoot))
 	require.NoError(t, db.SaveBlock(ctx, headBlock))
-	c := &Service{beaconDB: db, stateGen: stategen.New(db, sc)}
+	c := &Service{beaconDB: db}
 	require.NoError(t, c.initializeChainInfo(ctx))
 	s, err := c.HeadState(ctx)
 	require.NoError(t, err)
@@ -323,18 +322,17 @@ func TestChainService_InitializeChainInfo_SetHeadAtGenesis(t *testing.T) {
 }
 
 func TestChainService_SaveHeadNoDB(t *testing.T) {
-	db, sc := testDB.SetupDB(t)
+	db, _ := testDB.SetupDB(t)
 	ctx := context.Background()
 	s := &Service{
 		beaconDB: db,
-		stateGen: stategen.New(db, sc),
 	}
 	b := testutil.NewBeaconBlock()
 	b.Block.Slot = 1
 	r, err := b.HashTreeRoot()
 	require.NoError(t, err)
 	newState := testutil.NewBeaconState()
-	require.NoError(t, s.beaconDB.SaveState(ctx, r, newState))
+	require.NoError(t, s.beaconDB.SaveState(ctx, newState, r))
 	require.NoError(t, s.saveHeadNoDB(ctx, b, r, newState))
 
 	newB, err := s.beaconDB.HeadBlock(ctx)
