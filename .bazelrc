@@ -1,3 +1,6 @@
+# Test failures in shards seem to be failing
+test --test_sharding_strategy=disabled
+
 # Print warnings for tests with inappropriate test size or timeout.
 test --test_verbose_timeout_warnings
 
