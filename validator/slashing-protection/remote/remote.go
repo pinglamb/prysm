@@ -7,9 +7,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type RemoteProtector struct{}
+
 // CheckBlockSafety this function is part of slashing protection for block proposals it performs
 // validation without db update. To be used before the block is signed.
-func (s *Service) CheckBlockSafety(ctx context.Context, blockHeader *ethpb.BeaconBlockHeader) bool {
+func (s *RemoteProtector) IsBlockSlashable(ctx context.Context, blockHeader *ethpb.BeaconBlockHeader) bool {
 	slashable, err := s.slasherClient.IsSlashableBlockNoUpdate(ctx, blockHeader)
 	if err != nil {
 		log.Errorf("External slashing block protection returned an error: %v", err)
@@ -23,7 +25,7 @@ func (s *Service) CheckBlockSafety(ctx context.Context, blockHeader *ethpb.Beaco
 
 // CommitBlock this function is part of slashing protection for block proposals it performs
 // validation and db update. To be used after the block is proposed.
-func (s *Service) CommitBlock(ctx context.Context, blockHeader *ethpb.SignedBeaconBlockHeader) (bool, error) {
+func (s *RemoteProtector) CommitBlock(ctx context.Context, blockHeader *ethpb.SignedBeaconBlockHeader) (bool, error) {
 	ps, err := s.slasherClient.IsSlashableBlock(ctx, blockHeader)
 	if err != nil {
 		log.Errorf("External slashing block protection returned an error: %v", err)

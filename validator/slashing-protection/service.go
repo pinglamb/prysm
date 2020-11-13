@@ -1,25 +1,23 @@
-package remote
+package slashingprotection
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"strings"
 	"time"
 
-	middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
-	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	ethsl "github.com/prysmaticlabs/prysm/proto/slashing"
-	"github.com/prysmaticlabs/prysm/shared/grpcutils"
-	log "github.com/sirupsen/logrus"
-	"go.opencensus.io/plugin/ocgrpc"
+	ethpb "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
+
+	ethsl "github.com/prysmaticlabs/prysm/proto/slashing"
 )
+
+// Protector interface defines a struct which provides methods
+// for validator slashing protection.
+type Protector interface {
+	IsSlashableAttestation(ctx context.Context, attestation *ethpb.IndexedAttestation) bool
+	CommitAttestation(ctx context.Context, attestation *ethpb.IndexedAttestation) bool
+	IsSlashableBlock(ctx context.Context, blockHeader *ethpb.BeaconBlockHeader) bool
+	CommitBlock(ctx context.Context, blockHeader *ethpb.SignedBeaconBlockHeader) (bool, error)
+}
 
 // Service represents a service to manage the validator
 // ￿slashing protection.
