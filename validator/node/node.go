@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
+
 	"github.com/prysmaticlabs/prysm/shared"
 	"github.com/prysmaticlabs/prysm/shared/cmd"
 	"github.com/prysmaticlabs/prysm/shared/debug"
@@ -34,6 +35,8 @@ import (
 	"github.com/prysmaticlabs/prysm/validator/rpc"
 	"github.com/prysmaticlabs/prysm/validator/rpc/gateway"
 	slashing_protection "github.com/prysmaticlabs/prysm/validator/slashing-protection"
+	"github.com/prysmaticlabs/prysm/validator/slashing-protection/remote"
+
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -361,7 +364,7 @@ func (s *ValidatorClient) registerClientService(
 	maxCallRecvMsgSize := s.cliCtx.Int(cmd.GrpcMaxCallRecvMsgSizeFlag.Name)
 	grpcRetries := s.cliCtx.Uint(flags.GrpcRetriesFlag.Name)
 	grpcRetryDelay := s.cliCtx.Duration(flags.GrpcRetryDelayFlag.Name)
-	var sp *slashing_protection.Service
+	var sp *remote.Service
 	var protector slashing_protection.Protector
 	if err := s.services.FetchService(&sp); err == nil {
 		protector = sp
@@ -399,7 +402,7 @@ func (s *ValidatorClient) registerSlasherClientService() error {
 	maxCallRecvMsgSize := s.cliCtx.Int(cmd.GrpcMaxCallRecvMsgSizeFlag.Name)
 	grpcRetries := s.cliCtx.Uint(flags.GrpcRetriesFlag.Name)
 	grpcRetryDelay := s.cliCtx.Duration(flags.GrpcRetryDelayFlag.Name)
-	sp, err := slashing_protection.NewService(s.cliCtx.Context, &slashing_protection.Config{
+	sp, err := remote.NewService(s.cliCtx.Context, &remote.Config{
 		Endpoint:                   endpoint,
 		CertFlag:                   cert,
 		GrpcMaxCallRecvMsgSizeFlag: maxCallRecvMsgSize,

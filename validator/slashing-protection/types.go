@@ -6,11 +6,11 @@ import (
 	eth "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
 )
 
-// Protector interface defines the methods of the service that provides slashing protection.
+// Protector interface defines a struct which provides methods
+// for validator slashing protection.
 type Protector interface {
-	CheckAttestationSafety(ctx context.Context, attestation *eth.IndexedAttestation) bool
+	IsSlashableAttestation(ctx context.Context, attestation *eth.IndexedAttestation) bool
 	CommitAttestation(ctx context.Context, attestation *eth.IndexedAttestation) bool
-	CheckBlockSafety(ctx context.Context, blockHeader *eth.BeaconBlockHeader) bool
+	IsSlashableBlock(ctx context.Context, blockHeader *eth.BeaconBlockHeader) bool
 	CommitBlock(ctx context.Context, blockHeader *eth.SignedBeaconBlockHeader) (bool, error)
-	Status() error
 }

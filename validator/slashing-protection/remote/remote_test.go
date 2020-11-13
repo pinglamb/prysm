@@ -1,4 +1,4 @@
-package slashingprotection
+package remote
 
 import (
 	"context"
