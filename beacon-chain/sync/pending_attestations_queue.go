@@ -3,9 +3,11 @@ package sync
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"sync"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	gcache "github.com/patrickmn/go-cache"
 	ethpb "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/shared/bls"
@@ -47,19 +49,26 @@ func (s *Service) processPendingAtts(ctx context.Context) error {
 	// be deleted from the queue if invalid (ie. getting staled from falling too many slots behind).
 	s.validatePendingAtts(ctx, s.chain.CurrentSlot())
 
-	s.pendingAttsLock.RLock()
-	roots := make([][32]byte, 0, len(s.blkRootToPendingAtts))
-	for br := range s.blkRootToPendingAtts {
-		roots = append(roots, br)
+	roots := make([][32]byte, 0, s.blkRootToPendingAtts.ItemCount())
+	for r := range s.blkRootToPendingAtts.Items() {
+		r32 := bytesutil.ToBytes32([]byte(r))
+		roots = append(roots, r32)
 	}
-	s.pendingAttsLock.RUnlock()
 
 	var pendingRoots [][32]byte
 	randGen := rand.NewGenerator()
 	for _, bRoot := range roots {
-		s.pendingAttsLock.RLock()
-		attestations := s.blkRootToPendingAtts[bRoot]
-		s.pendingAttsLock.RUnlock()
+		value, ok := s.blkRootToPendingAtts.Get(string(bRoot[:]))
+		if !ok {
+			// This shouldn't happen but if block root doesn't exist in block root to pending attestations queue, continue.
+			continue
+		}
+		attestations, ok := value.([]*ethpb.SignedAggregateAttestationAndProof)
+		if !ok {
+			// This shouldn't happen but if we can't covert cached item to SignedAggregateAttestationAndProof, continue.
+			continue
+		}
+
 		// Has the pending attestation's missing block arrived and the node processed block yet?
 		hasStateSummary := s.db.HasStateSummary(ctx, bRoot) || s.stateSummaryCache.Has(bRoot)
 		if s.db.HasBlock(ctx, bRoot) && (s.db.HasState(ctx, bRoot) || hasStateSummary) {
@@ -111,9 +120,7 @@ func (s *Service) processPendingAtts(ctx context.Context) error {
 			}).Info("Verified and saved pending attestations to pool")
 
 			// Delete the missing block root key from pending attestation queue so a node will not request for the block again.
-			s.pendingAttsLock.Lock()
-			delete(s.blkRootToPendingAtts, bRoot)
-			s.pendingAttsLock.Unlock()
+			s.blkRootToPendingAtts.Delete(string(bRoot[:]))
 		} else {
 			// Pending attestation's missing block has not arrived yet.
 			log.WithFields(logrus.Fields{
@@ -131,39 +138,45 @@ func (s *Service) processPendingAtts(ctx context.Context) error {
 // This defines how pending attestations is saved in the map. The key is the
 // root of the missing block. The value is the list of pending attestations
 // that voted for that block root.
-func (s *Service) savePendingAtt(att *ethpb.SignedAggregateAttestationAndProof) {
+func (s *Service) savePendingAtt(att *ethpb.SignedAggregateAttestationAndProof) error {
 	root := bytesutil.ToBytes32(att.Message.Aggregate.Data.BeaconBlockRoot)
+	k := string(root[:])
 
-	s.pendingAttsLock.Lock()
-	defer s.pendingAttsLock.Unlock()
-	_, ok := s.blkRootToPendingAtts[root]
+	value, ok := s.blkRootToPendingAtts.Get(k)
 	if !ok {
-		s.blkRootToPendingAtts[root] = []*ethpb.SignedAggregateAttestationAndProof{att}
-		return
+		return s.blkRootToPendingAtts.Add(k, []*ethpb.SignedAggregateAttestationAndProof{att}, gcache.DefaultExpiration)
+	}
+	atts, ok := value.([]*ethpb.SignedAggregateAttestationAndProof)
+	if !ok {
+		return errors.New("could not convert item to SignedAggregateAttestationAndProof")
 	}
 
 	// Skip if the attestation from the same aggregator already exists in the pending queue.
-	for _, a := range s.blkRootToPendingAtts[root] {
+	for _, a := range atts {
 		if a.Message.AggregatorIndex == att.Message.AggregatorIndex {
-			return
+			return nil
 		}
 	}
 
-	s.blkRootToPendingAtts[root] = append(s.blkRootToPendingAtts[root], att)
+	atts = append(atts, att)
+	return s.blkRootToPendingAtts.Add(k, atts, gcache.DefaultExpiration)
 }
 
 // This validates the pending attestations in the queue are still valid.
 // If not valid, a node will remove it in the queue in place. The validity
 // check specifies the pending attestation could not fall one epoch behind
 // of the current slot.
-func (s *Service) validatePendingAtts(ctx context.Context, slot uint64) {
+func (s *Service) validatePendingAtts(ctx context.Context, slot uint64) error {
 	ctx, span := trace.StartSpan(ctx, "validatePendingAtts")
 	defer span.End()
 
-	s.pendingAttsLock.Lock()
-	defer s.pendingAttsLock.Unlock()
+	items := s.blkRootToPendingAtts.Items()
+	for k, v := range items {
+		atts, ok := v.Object.([]*ethpb.SignedAggregateAttestationAndProof)
+		if !ok {
+			return errors.New("could not convert item to SignedAggregateAttestationAndProof")
+		}
 
-	for bRoot, atts := range s.blkRootToPendingAtts {
 		for i := len(atts) - 1; i >= 0; i-- {
 			if slot >= atts[i].Message.Aggregate.Data.Slot+params.BeaconConfig().SlotsPerEpoch {
 				// Remove the pending attestation from the list in place.
@@ -171,7 +184,9 @@ func (s *Service) validatePendingAtts(ctx context.Context, slot uint64) {
 				numberOfAttsNotRecovered.Inc()
 			}
 		}
-		s.blkRootToPendingAtts[bRoot] = atts
+		if err := s.blkRootToPendingAtts.Add(k, atts, gcache.DefaultExpiration); err != nil {
+			return err
+		}
 
 		// If the pending attestations list of a given block root is empty,
 		// a node will remove the key from the map to avoid dangling keys.
@@ -180,4 +195,5 @@ func (s *Service) validatePendingAtts(ctx context.Context, slot uint64) {
 			numberOfBlocksNotRecoveredFromAtt.Inc()
 		}
 	}
+	return nil
 }
