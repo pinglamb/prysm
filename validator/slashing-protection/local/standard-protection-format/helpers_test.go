@@ -20,6 +20,12 @@ func Test_uint64FromString(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "Max Uint64 works",
+			str:     "18446744073709551615",
+			want:    math.MaxUint64,
+			wantErr: false,
+		},
+		{
 			name:    "Negative number fails",
 			str:     "-3",
 			wantErr: true,
@@ -129,12 +135,12 @@ func Test_rootFromHex(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Works with 0x prefix and good public key",
+			name: "Works with 0x prefix and good root",
 			str:  "0x4ff6f743a43f3b4f95350831aeaf0a122a1a392922c45d804280284a69eb850b",
 			want: [32]byte{79, 246, 247, 67, 164, 63, 59, 79, 149, 53, 8, 49, 174, 175, 10, 18, 42, 26, 57, 41, 34, 196, 93, 128, 66, 128, 40, 74, 105, 235, 133, 11},
 		},
 		{
-			name: "Works without 0x prefix and good public key",
+			name: "Works without 0x prefix and good root",
 			str:  "4ff6f743a43f3b4f95350831aeaf0a122a1a392922c45d804280284a69eb850b",
 			want: [32]byte{79, 246, 247, 67, 164, 63, 59, 79, 149, 53, 8, 49, 174, 175, 10, 18, 42, 26, 57, 41, 34, 196, 93, 128, 66, 128, 40, 74, 105, 235, 133, 11},
 		},
