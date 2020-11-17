@@ -5,10 +5,11 @@ import (
 	"time"
 
 	ethpb "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
-	"google.golang.org/grpc"
-
-	ethsl "github.com/prysmaticlabs/prysm/proto/slashing"
+	"github.com/prysmaticlabs/prysm/shared"
+	"github.com/sirupsen/logrus"
 )
+
+var log = logrus.WithField("prefix", "slashing-protection")
 
 // Protector interface defines a struct which provides methods
 // for validator slashing protection.
@@ -17,26 +18,20 @@ type Protector interface {
 	CommitAttestation(ctx context.Context, attestation *ethpb.IndexedAttestation) bool
 	IsSlashableBlock(ctx context.Context, blockHeader *ethpb.BeaconBlockHeader) bool
 	CommitBlock(ctx context.Context, blockHeader *ethpb.SignedBeaconBlockHeader) (bool, error)
+	shared.Service
 }
 
-// Service represents a service to manage the validator
-// ￿slashing protection.
+// Service to manage validator slashing protection. Local slashing
+// protection is mandatory at runtime but remote protection is optional.
 type Service struct {
-	ctx                context.Context
-	cancel             context.CancelFunc
-	conn               *grpc.ClientConn
-	endpoint           string
-	withCert           string
-	maxCallRecvMsgSize int
-	grpcRetries        uint
-	grpcHeaders        []string
-	slasherClient      ethsl.SlasherClient
-	grpcRetryDelay     time.Duration
+	ctx             context.Context
+	cancel          context.CancelFunc
+	remoteProtector Protector
 }
 
-// Config for the validator service.
+// Config for the slashing protection service.
 type Config struct {
-	Endpoint                   string
+	SlasherEndpoint            string
 	CertFlag                   string
 	GrpcMaxCallRecvMsgSizeFlag int
 	GrpcRetriesFlag            uint
@@ -48,101 +43,41 @@ type Config struct {
 // registry.
 func NewService(ctx context.Context, cfg *Config) (*Service, error) {
 	ctx, cancel := context.WithCancel(ctx)
-	return &Service{
-		ctx:                ctx,
-		cancel:             cancel,
-		endpoint:           cfg.Endpoint,
-		withCert:           cfg.CertFlag,
-		maxCallRecvMsgSize: cfg.GrpcMaxCallRecvMsgSizeFlag,
-		grpcRetries:        cfg.GrpcRetriesFlag,
-		grpcRetryDelay:     cfg.GrpcRetryDelay,
-		grpcHeaders:        strings.Split(cfg.GrpcHeadersFlag, ","),
-	}, nil
-}
-
-// Start the slasher protection service and grpc client.
-func (s *Service) Start() {
-	if s.endpoint != "" {
-		s.slasherClient = s.startSlasherClient()
+	srv := &Service{
+		ctx:    ctx,
+		cancel: cancel,
 	}
-}
-
-func (s *Service) startSlasherClient() ethsl.SlasherClient {
-	var dialOpt grpc.DialOption
-
-	if s.withCert != "" {
-		creds, err := credentials.NewClientTLSFromFile(s.withCert, "")
+	if cfg.SlasherEndpoint != "" {
+		rp, err := NewRemoteProtector(ctx, cfg)
 		if err != nil {
-			log.Errorf("Could not get valid slasher credentials: %v", err)
-			return nil
+			return nil, err
 		}
-		dialOpt = grpc.WithTransportCredentials(creds)
-	} else {
-		dialOpt = grpc.WithInsecure()
-		log.Warn("You are using an insecure slasher gRPC connection! Please provide a certificate and key to use a secure connection.")
+		srv.remoteProtector = rp
 	}
-
-	md := make(metadata.MD)
-	for _, hdr := range s.grpcHeaders {
-		if hdr != "" {
-			ss := strings.Split(hdr, "=")
-			if len(ss) != 2 {
-				log.Warnf("Incorrect gRPC header flag format. Skipping %v", hdr)
-				continue
-			}
-			md.Set(ss[0], ss[1])
-		}
-	}
-
-	opts := []grpc.DialOption{
-		dialOpt,
-		grpc.WithDefaultCallOptions(
-			grpc_retry.WithMax(s.grpcRetries),
-			grpc_retry.WithBackoff(grpc_retry.BackoffLinear(s.grpcRetryDelay)),
-			grpc.Header(&md),
-		),
-		grpc.WithStatsHandler(&ocgrpc.ClientHandler{}),
-		grpc.WithStreamInterceptor(middleware.ChainStreamClient(
-			grpc_opentracing.StreamClientInterceptor(),
-			grpc_prometheus.StreamClientInterceptor,
-			grpc_retry.StreamClientInterceptor(),
-		)),
-		grpc.WithUnaryInterceptor(middleware.ChainUnaryClient(
-			grpc_opentracing.UnaryClientInterceptor(),
-			grpc_prometheus.UnaryClientInterceptor,
-			grpc_retry.UnaryClientInterceptor(),
-			grpcutils.LogGRPCRequests,
-		)),
-	}
-	conn, err := grpc.DialContext(s.ctx, s.endpoint, opts...)
-	if err != nil {
-		log.Errorf("Could not dial slasher endpoint: %s, %v", s.endpoint, err)
-		return nil
-	}
-	log.Debug("Successfully started slasher gRPC connection")
-	s.conn = conn
-	return ethsl.NewSlasherClient(s.conn)
-
+	return srv, nil
 }
 
-// Stop the validator service.
+// Start the slasher protection service.
+func (s *Service) Start() {
+	if s.remoteProtector != nil {
+		s.remoteProtector.Start()
+	}
+}
+
+// Stop --
 func (s *Service) Stop() error {
 	s.cancel()
 	log.Info("Stopping slashing protection service")
-	if s.conn != nil {
-		return s.conn.Close()
+	if s.remoteProtector != nil {
+		return s.remoteProtector.Stop()
 	}
 	return nil
 }
 
-// Status checks if the connection to slasher server is ready,
-// returns error otherwise.
+// Status --
 func (s *Service) Status() error {
-	if s.conn == nil {
-		return errors.New("no connection to slasher RPC")
-	}
-	if s.conn.GetState() != connectivity.Ready {
-		return fmt.Errorf("can`t connect to slasher server at: %v connection status: %v ", s.endpoint, s.conn.GetState())
+	if s.remoteProtector != nil {
+		return s.remoteProtector.Status()
 	}
 	return nil
 }

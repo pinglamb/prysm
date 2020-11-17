@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"testing"
 
+	logTest "github.com/sirupsen/logrus/hooks/test"
+
 	"github.com/prysmaticlabs/prysm/shared/bls"
 	"github.com/prysmaticlabs/prysm/shared/bytesutil"
 	"github.com/prysmaticlabs/prysm/shared/hashutil"
@@ -19,7 +21,6 @@ import (
 	"github.com/prysmaticlabs/prysm/shared/testutil/require"
 	"github.com/prysmaticlabs/prysm/validator/db/kv"
 	dbtest "github.com/prysmaticlabs/prysm/validator/db/testing"
-	logTest "github.com/sirupsen/logrus/hooks/test"
 )
 
 func TestStore_ImportInterchangeData_BadJSON(t *testing.T) {
