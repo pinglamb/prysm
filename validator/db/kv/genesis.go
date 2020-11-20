@@ -29,7 +29,7 @@ func (s *Store) GenesisValidatorsRoot(ctx context.Context) ([]byte, error) {
 		if len(enc) == 0 {
 			return nil
 		}
-		genValRoot = enc
+		copy(genValRoot, enc)
 		return nil
 	})
 	return genValRoot, err
